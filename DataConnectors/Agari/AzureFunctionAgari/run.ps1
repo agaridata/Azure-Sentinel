@@ -27,6 +27,12 @@ $GraphTenantId = $env:GraphTenantId
 $GraphClientId = $env:GraphClientId
 $GraphClientSecret = $env:GraphClientSecret
 
+#Define Product(s) Enabled
+$bpEnabled = $env:enableBrandProtectionAPI
+$aprEnabled = $env:enablePhishingResponseAPI
+$apdEnabled = $env:enablePhishingDefenseAPI
+$sgEnabled = $env:enableSecurityGraphSharing
+
 # Function to build the Authorization signature for the Log Analytics Data Connector API
 Function Build-Signature ($customerId, $sharedKey, $date, $contentLength, $method, $contentType, $resource)
 {
@@ -130,6 +136,8 @@ Function Body-SentinelTI($GraphTenantId,$IoC_Type,$IoC,$Product,$expiry){
     
 # Setup the SGAPI call
 if ($sgEnabled){
+    # Set a 10 day expiry for the IoC
+    $expiry=(Get-Date (get-date).addDays(10) -UFormat "+%Y-%m-%dT%H:00:00.00Z")
     #Get the token for the Securty Graph API calls
         $uri = "https://login.microsoftonline.com/$GraphTenantId/oauth2/v2.0/token"
         $body = @{
@@ -140,19 +148,25 @@ if ($sgEnabled){
         }
         # Get OAuth 2.0 Token
         $tokenRequest = Invoke-WebRequest -Method Post -Uri $uri -ContentType "application/x-www-form-urlencoded" -Body $body -UseBasicParsing
-        # Unpack Access Token
-        $sgapi_token = ($tokenRequest.Content | ConvertFrom-Json).access_token
-        # Base URL
-        $sgapi_uri = 'https://graph.microsoft.com/beta/security/tiIndicators'
-        $sgapi_headers = @{
+        # Unpack Access Token if we get a success
+        if ($tokenRequest.StatusCode -eq 200) {
+            $sgapi_token = ($tokenRequest.Content | ConvertFrom-Json).access_token
+            # Base URL
+            $sgapi_uri = 'https://graph.microsoft.com/beta/security/tiIndicators'
+            $sgapi_headers = @{
                             'Authorization' = "Bearer $sgapi_token"
                             'ContentType' = 'application/json'
-                        }
+                        } 
+        } else {
+            $sgEnabled = $false
+            Write-Host "Error fetching token for the Security Graph API call"
+        }
+        
 }
 
 #Set uris for get/revoke bearer tokens
 $get_apd_token_uri='https://api.agari.com/v1/ep/token'
-$get_bp_token_uri='https://api.agari.com:443/v1/cp/oauth/token'
+$get_bp_token_uri='https://api.agari.com/v1/cp/oauth/token'
 $get_apr_token_uri='https://api.agari.com/v1/apr/token'
 $revoke_apd_token_uri='https://api.agari.com/v1/ep/revoke'
 $revoke_apr_token_uri='https://api.agari.com/v1/apr/revoke'
@@ -166,7 +180,7 @@ if ($bpEnabled){
     # set the headers
     if ($bpToken){
         $bpHeaders = @{
-                    'Authorization'="Bearer $bpToken"
+                    'Authorization' = "Bearer $bpToken"
                     'ContentType' = 'application/json'
                 }
     } else { 
@@ -235,10 +249,8 @@ if (($bpEnabled) -and ($bpToken)) {
             }
     }
     
-    # Do the Alerts to Security Graph if enabled
+    # Load the URLs from the BP Threat Feed to Security Graph if enabled
     if ($sgEnabled){
-        # Set a 10 day expiry for the IoC
-        $expiry=(Get-Date (get-date).addDays(10) -UFormat "+%Y-%m-%dT%H:00:00.00Z")
         $Product = 'Brand Protection'
         #Get the Threat Feed ID
         $BP_TF_Url = "https://api.agari.com/v1/cp/threat_feeds"
@@ -356,7 +368,13 @@ if ($sgEnabled){
     }   
 }
 
-#Revoke the Tokens!
-RevokeToken $revoke_bp_token_uri $bpToken
-RevokeToken $revoke_apr_token_uri $aprToken
-RevokeToken $revoke_apd_token_uri $apdToken
+# We done, revoke the Tokens!
+if (($bpEnabled) -and ($bpToken)){ 
+    RevokeToken $revoke_bp_token_uri $bpToken 
+}
+if (($apdEnabled) -and ($apdToken)){
+    RevokeToken $revoke_apd_token_uri $apdToken
+}
+if (($aprEnabled) -and ($aprToken)){
+    RevokeToken $revoke_apr_token_uri $aprToken
+}
