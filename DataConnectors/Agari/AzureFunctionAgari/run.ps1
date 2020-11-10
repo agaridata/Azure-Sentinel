@@ -182,13 +182,14 @@ if ($bpEnabled){
         $bpHeaders = @{
                     'Authorization' = "Bearer $bpToken"
                     'ContentType' = 'application/json'
+                    'x-api-requestby' = 'Sentinel/Powershell'
                 }
     } else { 
         $bpToken = $false
         Write-Host "Error Fetching BP Token" 
         }
 } 
-if ($adEnabled){
+if ($apdEnabled){
     #Get the bearer token
     $apdToken = GetToken $client_id $client_secret $get_apd_token_uri
     # set the headers
@@ -196,6 +197,7 @@ if ($adEnabled){
         $apdHeaders = @{
                     'Authorization'="Bearer $apdToken"
                     'ContentType' = 'application/json'
+                    'x-api-requestby' = 'Sentinel/Powershell'
                 }
     } else { 
         $apdToken = $false
@@ -210,6 +212,7 @@ if ($aprEnabled){
         $aprHeaders = @{
                     'Authorization'="Bearer $aprToken"
                     'ContentType' = 'application/json'
+                    'x-api-requestby' = 'Sentinel/Powershell'
                 }
     } else { 
         $aprToken = $false
@@ -280,18 +283,18 @@ if (($apdEnabled) -and ($apdToken)){
         #Get the APD policy hits with the offset for paging
         do {
             $APDPolicyAPI = "https://api.agari.com/v1/ep/policy_events?limit=$limit&offset=$offset&sort=created_at%20DESC&policy_enabled=true&start_date=$startdate&end_date=$enddate"
-            Invoke-RestMethod -Uri $APDPolicyAPI -Method 'GET' -Headers $apd_headersAPI | ForEach-Object {
+            Invoke-RestMethod -Uri $APDPolicyAPI -Method 'GET' -Headers $apdHeaders | ForEach-Object {
                 $APDPolicyData += $_.alert_events | Select-Object -Property created_at, id, alert_definition_name
                 $count = $_.count
                 }
                 $offset += $limit
         } while ($count -eq $limit)
 
-        #Convert log to JSON
-        $APDPolicyLog = $APDPolicyData | ConvertTo-JSON
-        #Post the data to log analytics API
-        Post-LogAnalyticsData -customerId $customerId -sharedKey $sharedKey -body ([System.Text.Encoding]::UTF8.GetBytes($APDPolicyLog)) -logType "agari_apdpolicy_log"
-                
+        # If there are results, convert log to JSON and Post the data to log analytics API
+        if ($APDPolicyData){
+            $APDPolicyLog = $APDPolicyData | ConvertTo-JSON
+            Post-LogAnalyticsData -customerId $customerId -sharedKey $sharedKey -body ([System.Text.Encoding]::UTF8.GetBytes($APDPolicyLog)) -logType "agari_apdpolicy_log"
+        }    
         #Get the Threat Categories and push to Sentinel
         #Reset the Offset
         $offset = 0   
@@ -305,10 +308,11 @@ if (($apdEnabled) -and ($apdToken)){
         $offset += $limit
         } while ($count -eq $limit)
         
-        #Convert log to JSON
-        $APDThreatCatLog = $APDThreatCatData | ConvertTo-Json
-        #Post the data to log analytics API
-        Post-LogAnalyticsData -customerId $customerId -sharedKey $sharedKey -body ([System.Text.Encoding]::UTF8.GetBytes($APDThreatCatLog)) -logType "agari_apdtc_log"
+        # If there are results, convert log to JSON and Post the data to log analytics API
+        if ($APDThreatCatData){
+            $APDThreatCatLog = $APDThreatCatData | ConvertTo-Json
+            Post-LogAnalyticsData -customerId $customerId -sharedKey $sharedKey -body ([System.Text.Encoding]::UTF8.GetBytes($APDThreatCatLog)) -logType "agari_apdtc_log"
+        }
 }
 
 # ---------------------------------------------------------------------- #
