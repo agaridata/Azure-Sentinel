@@ -221,7 +221,7 @@ if ($bpEnabled){
         $bpHeaders = @{
                     'Authorization' = "Bearer $bpToken"
                     'ContentType' = 'application/json'
-                    'UserAgent' = 'AgariSentinel BP_APD_Integration/v1.0 SentinelPowerShellCore/v7'
+                    'UserAgent' = "AgariSentinel BP_Integration/v1.0 SentinelPowerShellCore/v$PSVersionTable.PSVersion.major"
                 }
     } else { 
         $bpToken = $false
@@ -236,7 +236,7 @@ if ($apdEnabled){
         $apdHeaders = @{
                     'Authorization'="Bearer $apdToken"
                     'ContentType' = 'application/json'
-                    'UserAgent' = 'AgariSentinel BP_APD_Integration/v1.0 SentinelPowerShellCore/v7'
+                    'UserAgent' = "AgariSentinel APD_Integration/v1.0 SentinelPowerShellCore/v$PSVersionTable.PSVersion.major"
                 }
     } else { 
         $apdToken = $false
@@ -251,7 +251,7 @@ if ($aprEnabled){
         $aprHeaders = @{
                     'Authorization'="Bearer $aprToken"
                     'ContentType' = 'application/json'
-                    'UserAgent' = 'AgariSentinel BP_APD_Integration/v1.0 SentinelPowerShellCore/v7'
+                    'UserAgent' = "AgariSentinel APR_Integration/v1.0 SentinelPowerShellCore/v$PSVersionTable.PSVersion.major"
                 }
     } else { 
         $aprToken = $false
@@ -260,6 +260,9 @@ if ($aprEnabled){
 }
 
 #Set global api variables
+#set first run startdate
+$fr_startdate=(Get-Date (get-date).addMinutes(-6) -UFormat "+%Y-%m-%dT%H:%M:00:001Z")
+#set the enddate
 $enddate=(Get-Date (get-date).addMinutes(-1) -UFormat "+%Y-%m-%dT%H:%M:00.000Z")
 #if successful, we'll popoulate the environment variable with the end date + 1ms
 $nextStartDate = (Get-Date (get-date).addMinutes(-1) -UFormat "+%Y-%m-%dT%H:%M:00:001Z")
@@ -275,13 +278,13 @@ $TimeStampField = "DateValue"
 if (($bpEnabled) -and ($bpToken)) {
     #Check to see if start time empty - usally first run, otherwise set the time from the env variable
     if ($BPlastLog){
-        $startdate = $BPlastLog.substring(1)  
+        $BPstartdate = $BPlastLog.substring(1)  
     } else {
-        $startdate=(Get-Date (get-date).addMinutes(-6) -UFormat "+%Y-%m-%dT%H:%M:00:001Z")
-    } 
+        $BPstartdate = $fr_startdate
+    }
     $offset = 0
     do {
-        $BPAlertsListAPI = "https://api.agari.com/v1/cp/alert_events?start_date=$startdate&end_date=$enddate&fields=id%2C&limit=$limit&offset=$offset&sort=created_at%20ASC"
+        $BPAlertsListAPI = "https://api.agari.com/v1/cp/alert_events?start_date=$BPstartdate&end_date=$enddate&fields=id%2C&limit=$limit&offset=$offset&sort=created_at%20ASC"
         Invoke-RestMethod -Uri $BPAlertsListAPI -Method 'GET' -Headers $bpHeaders  | ForEach-Object {
         $ids += $_.alert_events | Select-Object -ExpandProperty id
         $count = $_.count
@@ -309,7 +312,7 @@ if (($bpEnabled) -and ($bpToken)) {
         if ($_.threat_feeds.id){
             $IoC_Type = 'URL'
             foreach ($sub_id in $_.threat_feeds.id){
-                $BP_SubmissionUrl = "https://api.agari.com/v1/cp/threat_feeds/$sub_id/submissions?start_date=$startdate&end_date=$enddate"
+                $BP_SubmissionUrl = "https://api.agari.com/v1/cp/threat_feeds/$sub_id/submissions?start_date=$BPstartdate&end_date=$enddate"
                 Invoke-RestMethod -Uri $BP_SubmissionUrl -Method 'GET' -Headers $bpHeaders | ForEach-Object {
                     $bpBody = (Body-SentinelTI $GraphTenantId $IoC_Type $_.threat_feed_submissions.uri $Product $expiry)
                     Invoke-WebRequest -Method POST -Uri $sgapi_uri -Headers $sgapi_headers -Body $bpBody 
@@ -327,15 +330,15 @@ if (($bpEnabled) -and ($bpToken)) {
 if (($apdEnabled) -and ($apdToken)){
         #Check to see if start time empty - usally first run, otherwise set the time from the env variable
         if ($apdlastLog){
-            $startdate = $APDlastLog.substring(1)  
+            $APDstartdate = $APDlastLog.substring(1)  
         } else {
-            $startdate=(Get-Date (get-date).addMinutes(-6) -UFormat "+%Y-%m-%dT%H:%M:00:001Z")
+            $APDstartdate = $fr_startdate
         } 
         #Reset the Offset
         $offset = 0          
         #Get the APD policy hits with the offset for paging
         do {
-            $APDPolicyAPI = "https://api.agari.com/v1/ep/policy_events?limit=$limit&offset=$offset&sort=created_at%20DESC&policy_enabled=true&start_date=$startdate&end_date=$enddate"
+            $APDPolicyAPI = "https://api.agari.com/v1/ep/policy_events?limit=$limit&offset=$offset&sort=created_at%20DESC&policy_enabled=true&start_date=$APDstartdate&end_date=$enddate"
             Invoke-RestMethod -Uri $APDPolicyAPI -Method 'GET' -Headers $apdHeaders | ForEach-Object {
                 $APDPolicyData += $_.alert_events | Select-Object -Property created_at, id, alert_definition_name
                 $count = $_.count
@@ -353,7 +356,7 @@ if (($apdEnabled) -and ($apdToken)){
         $offset = 0   
         #Get the APD Threat Categories API call with the offset for paging
         do {
-        $APDThreatCatAPI = "https://api.agari.com/v1/ep/messages?start_date=$startdate&end_date=$enddate&fields=attack_types%2Cto%2Cfrom%2Cid%2Cfrom_domain%2Ctimestamp_ms&limit=$limit&offset=$offset&sort=timestamp_ms%20DESC&search=attack_types%20is%20not%20empty"
+        $APDThreatCatAPI = "https://api.agari.com/v1/ep/messages?start_date=$APDstartdate&end_date=$enddate&fields=attack_types%2Cto%2Cfrom%2Cid%2Cfrom_domain%2Ctimestamp_ms&limit=$limit&offset=$offset&sort=timestamp_ms%20DESC&search=attack_types%20is%20not%20empty"
             Invoke-RestMethod -Uri $APDThreatCatAPI -Method 'GET' -Headers $apdHeaders | ForEach-Object {
             $APDThreatCatData += $_.messages | Select-Object -Property to, from, from_domain, attack_types,id,timestamp_ms 
             $count = $_.count
@@ -377,13 +380,13 @@ if ($sgEnabled){
     if (($aprEnabled) -and ($aprToken)){
         #Check to see if start time empty - usally first run, otherwise set the time from the env variable
         if ($aprlastLog){
-            $startdate = $APRlastLog.substring(1)  
+            $APRstartdate = $APRlastLog.substring(1)  
         } else {
-            $startdate=(Get-Date (get-date).addMinutes(-6) -UFormat "+%Y-%m-%dT%H:%M:00:001Z")
+            $APRstartdate = $fr_startdate
         } 
         $Product = 'Phishing Response'
         #Query the latest investigations that are malicious and get the TIs
-        $APRUrl = "https://api.agari.com/v1/apr/investigations?start_date=$startdate&end_date=$enddate&classification=malicious"
+        $APRUrl = "https://api.agari.com/v1/apr/investigations?start_date=$APRstartdate&end_date=$enddate&classification=malicious"
         Invoke-RestMethod -Uri $APRUrl -Method 'GET' -Headers $aprHeaders | ForEach-Object {
             #Get the IDs of the investigations, we'll need these to get file hash values
             $inv_id = $_.investigations.id
