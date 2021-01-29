@@ -41,7 +41,7 @@ $bplastLog = $env:BPlastLogTime
 $apdlastLog = $env:APDlastLogTime
 $aprlastLog = $env:APRlastLogTime
 
-# Set boolean values based on env variables
+# Set boolean values based on environment variables
 if ($bpEnabled -Match "True"){
     $bpEnabled = $true
 } else {$bpEnabled = $false}
