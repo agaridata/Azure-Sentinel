@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ "$1" == "" ]
+then
+  echo "Enter project name:"
+  read projectName
+else
+  projectName=$1
+fi
+
+if [ "$2" == "" ]
+then
+  local_params=""
+else
+  local_params="@$2"
+fi
+
+templateFile=azuredeploy_Agari_API_FunctionApp.json
+
+echo "Creating Resource Group: $projectName"
+az group create \
+  --name $projectName \
+  --location "East US"
+
+echo "Creating Deployment Group: $projectName"
+az deployment group create \
+  --name DeployLocalTemplate \
+  --resource-group $projectName \
+  --template-file $templateFile \
+  --parameters projectName=$projectName $local_params \
+  --verbose
+
+echo "Assigning Subscription as Contributor role to FunctionApp: $projectName"
+funcID=$(az ad sp list --display-name $projectName --query [].objectId --output tsv)
+subID=$(az account list --query [].id --output tsv)
+az role assignment create --assignee "$funcID" --role "Contributor" --subscription "$subID"
+
+echo
+echo "Deployment Complete"

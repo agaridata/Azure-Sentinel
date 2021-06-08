@@ -44,7 +44,6 @@
             "lastDataReceivedQuery": "agari_apdpolicy_log_CL\n            | summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
         }
     ],
-    
     "connectivityCriterias": [
         {
             "type": "IsConnectedQuery",
@@ -82,7 +81,6 @@
                 }
             }
         ],
-        
         "customs": [
             {
                 "name": "Microsoft.Web/sites permissions",
@@ -98,7 +96,7 @@
                 "description": "The Agari Function App has the ability to share threat intelleigence with Sentinel via the Security Graph API. To use this feature, you will need to enable the [Sentinel Threat Intelligence Platforms connector](https://docs.microsoft.com/azure/sentinel/connect-threat-intelligence) as well as register an application in Azure Active Directory. "
             }
         ]
-       },
+    },
     "instructionSteps": [
         {
             "title": "",
@@ -112,7 +110,6 @@
             "title": "STEP 1 - Get your Agari API credentials",
             "description": "\n1. Log into any Agari product (Client ID and Secret are the same for all applications) \n2. Click on your username in the upper right and select **Settings**\n3. Click on the **Generate API Secret** link to generate an API client_id and client_secret (the link will read **Regenerate API Secret** if you have already generated an API client ID/secret previously)\n4. Copy both the client_id and client_secret that are generated"
         },
-        
         {
             "title": "STEP 2 - (Optional) Enable the Security Graph API",
             "description": "Follow the instrcutions found on article [Connect Azure Sentinel to your threat intelligence platform](https://docs.microsoft.com/azure/sentinel/connect-threat-intelligence#connect-azure-sentinel-to-your-threat-intelligence-platform). Once the application is created you will need to record the Tenant ID, Client ID and Client Secret." 
@@ -170,7 +167,7 @@
         }
     ],
     "metadata" : {
-		"id": "152fa8d4-b84b-4370-8317-b63ed52f9fe3",
+        "id": "152fa8d4-b84b-4370-8317-b63ed52f9fe3",
         "version": "1.0.0",
         "kind": "dataConnector",
         "source": {
@@ -184,5 +181,5 @@
             "link": "https://support.agari.com/hc/en-us/articles/360000645632-How-to-access-Agari-Support",
             "tier": "developer"
         }
-	}
+    }
 }

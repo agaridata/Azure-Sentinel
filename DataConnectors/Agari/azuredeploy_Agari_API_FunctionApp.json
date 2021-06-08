@@ -2,110 +2,103 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "FunctionName": {
-            "defaultValue": "agari",
+        "projectName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 11
+            "maxLength": 11,
+            "metadata": {
+                "description": "Specify a project name that is used for generating resource names."
+            },
+            "defaultValue": "Enter Project Name (up to 11 chars)"
         },
         "clientID": {
-            "type": "string",
-            "defaultValue": "Enter Agari Client ID"
-        },  
+            "type": "string"
+        },
         "clientSecret": {
-            "type": "string",
-            "defaultValue": "Enter Agari Client Secret"
-        },  
-        "workspaceID": {
-            "type": "string",
-            "defaultValue": "<workspaceID>"
+            "type": "string"
         },
-        "workspaceKey": {
-            "type": "string",
-            "defaultValue": "<workspaceKey>"
-        },
-		"enableBrandProtectionAPI": {
+        "enableBrandProtectionAPI": {
             "type": "bool"
-		},
-		"enablePhishingDefenseAPI": {
+        },
+        "enablePhishingDefenseAPI": {
             "type": "bool"
         },
         "enablePhishingResponseAPI": {
             "type": "bool"
         },
-		"enableSecurityGraphSharing": {
+        "enableSecurityGraphSharing": {
             "type": "bool"
-		},
-	 	"GraphTenantID": {
+        },
+         "graphTenantId": {
             "type": "string",
             "defaultValue": "Enter MS Graph Tenant ID"
-        },  
-        "GraphClientID": {
+        },
+        "graphClientId": {
             "type": "string",
             "defaultValue": "Enter MS Graph Client ID"
-        },  
-		"GraphClientSecret": {
-            "type": "string",
-            "defaultValue": "Enter MS Graph Client Secret"
-        }  
-
+        },
+        "graphClientSecret": {
+          "type": "string",
+          "defaultValue": "Enter MS Graph Client Secret"
+        },
+        "location": {
+            "type": "String",
+            "allowedValues": [
+              "eastus",
+              "westus"
+            ],
+            "defaultValue": "eastus",
+            "metadata": {
+              "description": "Specifies the location in which to create the workspace."
+            }
+        },
+        "sku": {
+            "type": "String",
+            "allowedValues": [
+              "Standalone",
+              "PerNode",
+              "PerGB2018"
+            ],
+            "defaultValue": "PerGB2018",
+            "metadata": {
+                "description": "Specifies the service tier of the workspace: Standalone, PerNode, Per-GB"
+            }
+        }
     },
     "variables": {
-        "FunctionName": "[concat(toLower(parameters('FunctionName')), uniqueString(resourceGroup().id))]",
-        "StorageSuffix":"[environment().suffixes.storage]",
-        "LogAnaltyicsUri":"[replace(environment().portal, 'https://portal', concat('https://', toLower(parameters('WorkspaceID')), '.ods.opinsights'))]"
-        },
-
+        "portal": "[environment().portal]",
+        "storageSuffix": "[environment().suffixes.storage]"
+    },
     "resources": [
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2015-11-01-preview",
+            "name": "[parameters('projectName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "sku": {
+                    "Name": "[parameters('sku')]"
+                },
+                "features": {
+                    "searchVersion": 1
+                }
+            }
+        },
         {
             "type": "Microsoft.Insights/components",
             "apiVersion": "2015-05-01",
-            "name": "[parameters('FunctionName')]",
+            "name": "[parameters('projectName')]",
             "location": "[resourceGroup().location]",
             "kind": "web",
             "properties": {
                 "Application_Type": "web",
-                "ApplicationId": "[parameters('FunctionName')]"
-            }
-        },
-        {
-            "type": "Microsoft.KeyVault/vaults",
-            "apiVersion": "2016-10-01",
-            "name": "[parameters('FunctionName')]",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "sku": {
-                    "family": "A",
-                    "name": "standard"
-                },
-                "tenantId": "[subscription().tenantId]",
-                "enabledForDeployment": false,
-                "enabledForDiskEncryption": false,
-                "enabledForTemplateDeployment": true,
-                "enableSoftDelete": true,
-                "accessPolicies": [
-                ]
-            }
-        },
-        {
-            "type": "Microsoft.KeyVault/vaults/secrets",
-            "apiVersion": "2016-10-01",
-            "name": "[concat(parameters('FunctionName'), '/workspaceKey')]",
-            "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults', parameters('FunctionName'))]"
-            ],
-            "properties": {
-                "value": "[parameters('workspaceKey')]",
-                "contentType": "string",
-                "attributes": {
-                    "enabled": true
-                }
+                "ApplicationId": "[parameters('projectName')]"
             }
         },
         {
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2019-06-01",
-            "name": "[tolower(parameters('FunctionName'))]",
+            "name": "[tolower(parameters('projectName'))]",
             "location": "[resourceGroup().location]",
             "sku": {
                 "name": "Standard_LRS",
@@ -140,7 +133,7 @@
         {
             "type": "Microsoft.Web/serverfarms",
             "apiVersion": "2018-02-01",
-            "name": "[parameters('FunctionName')]",
+            "name": "[parameters('projectName')]",
             "location": "[resourceGroup().location]",
             "sku": {
                 "name": "Y1",
@@ -148,7 +141,7 @@
             },
             "kind": "functionapp",
             "properties": {
-                "name": "[parameters('FunctionName')]",
+                "name": "[parameters('projectName')]",
                 "workerSize": "0",
                 "workerSizeId": "0",
                 "numberOfWorkers": "1"
@@ -157,9 +150,9 @@
         {
             "type": "Microsoft.Storage/storageAccounts/blobServices",
             "apiVersion": "2019-06-01",
-            "name": "[concat(parameters('FunctionName'), '/default')]",
+            "name": "[concat(parameters('projectName'), '/default')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('FunctionName')))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('projectName')))]"
             ],
             "sku": {
                 "name": "Standard_LRS",
@@ -178,9 +171,9 @@
         {
             "type": "Microsoft.Storage/storageAccounts/fileServices",
             "apiVersion": "2019-06-01",
-            "name": "[concat(parameters('FunctionName'), '/default')]",
+            "name": "[concat(parameters('projectName'), '/default')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('FunctionName')))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('projectName')))]"
             ],
             "sku": {
                 "name": "Standard_LRS",
@@ -196,23 +189,26 @@
         {
             "type": "Microsoft.Web/sites",
             "apiVersion": "2018-11-01",
-            "name": "[parameters('FunctionName')]",
+            "name": "[parameters('projectName')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('FunctionName')))]",
-                "[resourceId('Microsoft.Web/serverfarms', parameters('FunctionName'))]",
-                "[resourceId('Microsoft.KeyVault/vaults', parameters('FunctionName'))]",
-                "[resourceId('Microsoft.Insights/components', parameters('FunctionName'))]"
+                "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('projectName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', tolower(parameters('projectName')))]",
+                "[resourceId('Microsoft.Web/serverfarms', parameters('projectName'))]",
+                "[resourceId('Microsoft.Insights/components', parameters('projectName'))]"
             ],
             "kind": "functionapp",
             "identity": {
                 "type": "SystemAssigned"
             },
             "properties": {
-                "name": "[parameters('FunctionName')]",
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('FunctionName'))]",
+                "name": "[parameters('projectName')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('projectName'))]",
                 "httpsOnly": true,
-                "clientAffinityEnabled": true
+                "clientAffinityEnabled": true,
+                "siteConfig": {
+                    "powerShellVersion": "~7"
+                }
             },
             "resources": [
                 {
@@ -220,36 +216,36 @@
                     "type": "config",
                     "name": "appsettings",
                     "dependsOn": [
-                        "[concat('Microsoft.Web/sites/', parameters('FunctionName'))]"
+                        "[concat('Microsoft.Web/sites/', parameters('projectName'))]",
+                        "[concat('Microsoft.OperationalInsights/workspaces/', parameters('projectName'))]"
                     ],
                     "properties": {
                         "FUNCTIONS_EXTENSION_VERSION": "~3",
-                        "FUNCTIONS_WORKER_RUNTIME": "powershell",                                                                                                                                                                                                                                                                                   
-                        "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(resourceId('Microsoft.insights/components', parameters('FunctionName')), '2015-05-01').InstrumentationKey]",
-                        "APPLICATIONINSIGHTS_CONNECTION_STRING": "[reference(resourceId('microsoft.insights/components', parameters('FunctionName')), '2015-05-01').ConnectionString]",
-                        "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=', toLower(parameters('FunctionName')),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', toLower(parameters('FunctionName'))), '2019-06-01').keys[0].value, ';EndpointSuffix=',toLower(variables('StorageSuffix')))]",
-                        "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING": "[concat('DefaultEndpointsProtocol=https;AccountName=', toLower(parameters('FunctionName')),';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', toLower(parameters('FunctionName'))), '2019-06-01').keys[0].value, ';EndpointSuffix=',toLower(variables('StorageSuffix')))]",
-                        "WEBSITE_CONTENTSHARE": "[toLower(parameters('FunctionName'))]",
+                        "FUNCTIONS_WORKER_RUNTIME": "powershell",
+                        "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(resourceId('Microsoft.insights/components', parameters('projectName')), '2015-05-01').InstrumentationKey]",
+                        "APPLICATIONINSIGHTS_CONNECTION_STRING": "[reference(resourceId('microsoft.insights/components', parameters('projectName')), '2015-05-01').ConnectionString]",
+                        "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING": "[concat('DefaultEndpointsProtocol=https;AccountName=', toLower(parameters('projectName')),';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', toLower(parameters('projectName'))), '2019-06-01').keys[0].value, ';EndpointSuffix=',toLower(variables('storageSuffix')))]",
+                        "WEBSITE_CONTENTSHARE": "[toLower(parameters('projectName'))]",
+                        "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=', toLower(parameters('projectName')),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', toLower(parameters('projectName'))), '2019-06-01').keys[0].value, ';EndpointSuffix=',toLower(variables('storageSuffix')))]",
                         "clientID": "[parameters('clientID')]",
                         "clientSecret": "[parameters('clientSecret')]",
-                        "workspaceID": "[parameters('workspaceID')]",                   
-                        "workspaceKey": "[concat('@Microsoft.KeyVault(SecretUri=', reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('FunctionName'), 'workspaceKey')).SecretUriWithVersion, ')')]", 
-                        "GraphTenantID": "[parameters('GraphTenantID')]",
-                        "GraphClientID": "[parameters('GraphClientID')]",
-                        "GraphClientSecret": "[parameters('GraphClientSecret')]",
+                        "graphTenantId": "[parameters('graphTenantId')]",
+                        "graphClientId": "[parameters('graphClientId')]",
+                        "graphClientSecret": "[parameters('graphClientSecret')]",
                         "enablePhishingDefenseAPI": "[parameters('enablePhishingDefenseAPI')]",
                         "enableBrandProtectionAPI": "[parameters('enableBrandProtectionAPI')]",
                         "enablePhishingResponseAPI": "[parameters('enablePhishingResponseAPI')]",
                         "enableSecurityGraphSharing": "[parameters('enableSecurityGraphSharing')]",
-                        "functionName": "[parameters('FunctionName')]",
-                        "resGroup": "[resourceGroup().name]",
+                        "functionName": "[parameters('projectName')]",
+                        "resGroupName": "[resourceGroup().name]",
                         "subId": "[subscription().subscriptionId]",
-                        "APRlastLogTime": "",
-                        "APDlastLogTime": "",
-                        "BPlastLogTime": "",
-                        "logAnalyticsUri": "[variables('LogAnaltyicsUri')]",
+                        "bpLastLogTime": "",
+                        "pdLastLogTime": "",
+                        "prLastLogTime": "",
+                        "workspaceId": "[reference(resourceId(resourceGroup().name, 'Microsoft.OperationalInsights/workspaces/', parameters('projectName')), '2015-11-01-preview').customerId]",
+                        "workspaceKey": "[listKeys(resourceId(resourceGroup().name, 'Microsoft.OperationalInsights/workspaces/', parameters('projectName')), '2015-11-01-preview').primarySharedKey]",
+                        "logAnaltyicsUri": "[replace(variables('portal'), 'https://portal', concat('https://', toLower(reference(resourceId(resourceGroup().name, 'Microsoft.OperationalInsights/workspaces/', parameters('projectName')), '2015-11-01-preview').customerId), '.ods.opinsights'))]",
                         "WEBSITE_RUN_FROM_PACKAGE": "https://aka.ms/sentinel-agari-functionapp"
-                                                                                                                                                                     
                     } 
                 }
             ]
@@ -257,10 +253,10 @@
         {
             "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
             "apiVersion": "2019-06-01",
-            "name": "[concat(parameters('FunctionName'), '/default/azure-webjobs-hosts')]",
+            "name": "[concat(parameters('projectName'), '/default/azure-webjobs-hosts')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('FunctionName'), 'default')]",
-                "[resourceId('Microsoft.Storage/storageAccounts', parameters('FunctionName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('projectName'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('projectName'))]"
             ],
             "properties": {
                 "publicAccess": "None"
@@ -269,10 +265,10 @@
         {
             "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
             "apiVersion": "2019-06-01",
-            "name": "[concat(parameters('FunctionName'), '/default/azure-webjobs-secrets')]",
+            "name": "[concat(parameters('projectName'), '/default/azure-webjobs-secrets')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('FunctionName'), 'default')]",
-                "[resourceId('Microsoft.Storage/storageAccounts', parameters('FunctionName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('projectName'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('projectName'))]"
             ],
             "properties": {
                 "publicAccess": "None"
@@ -281,10 +277,10 @@
         {
             "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
             "apiVersion": "2019-06-01",
-            "name": "[concat(parameters('FunctionName'), '/default/', tolower(parameters('FunctionName')))]",
+            "name": "[concat(parameters('projectName'), '/default/', tolower(parameters('projectName')))]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('FunctionName'), 'default')]",
-                "[resourceId('Microsoft.Storage/storageAccounts', parameters('FunctionName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('projectName'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('projectName'))]"
             ],
             "properties": {
                 "shareQuota": 5120
